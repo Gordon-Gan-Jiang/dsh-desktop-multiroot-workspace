@@ -1,0 +1,13 @@
+# dsh-desktop-multiroot-workspace bundle patch layer (fork of dsh-multiroot-workspace,
+# adapted for dsh 0.1.2-alpha.1).
+# ui-workspace is NOT disabled: alpha.1's client tree requires the uiWorkspace
+# service that the stock @deepseek-ai/dsh-client-ui-workspace provides. The
+# multiroot settings page (settings.section) and workspace browser extension
+# ride the plugin's own client bundle instead.
+- insert:
+    - id: multiroot-workspace
+      name: dsh-desktop-multiroot-workspace
+    - id: multiroot-workspace-tools
+      name: dsh-desktop-multiroot-workspace/tools
+      config:
+        crossRootBash: 'off'   # off | ancestor | unfenced
