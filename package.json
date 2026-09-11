@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop-multiroot-workspace",
   "version": "0.1.0-desktop.2",
-  "description": "Multi-root logical Workspaces for DSH Desktop (fork of dsh-multiroot-workspace, adapted for dsh 0.1.2-alpha.1)",
+  "description": "Multi-root logical Workspaces for DSH Desktop (fork of dsh-multiroot-workspace, adapted for dsh 0.1.2-alpha.1). One logical workspace = multiple named root directories with a primary root; the Agent edits any root from one session.",
   "author": "Blackoutta <hyytez@gmail.com>",
   "keywords": [
     "deepseek",

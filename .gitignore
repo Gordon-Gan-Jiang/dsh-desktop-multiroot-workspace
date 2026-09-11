@@ -1,3 +1,11 @@
 node_modules/
 *.tsbuildinfo
 tests/browser/screenshots/*.png
+
+# macOS
+.DS_Store
+
+# IDEs
+.idea/
+.vscode/
+*.iml

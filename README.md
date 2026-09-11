@@ -1,39 +1,94 @@
-# dsh-multiroot-workspace
-<img width="682" height="608" alt="image" src="https://github.com/user-attachments/assets/4decf92e-c251-438d-bbd6-c143d66e84a2" />
+# dsh-desktop-multiroot-workspace
 
-<img width="2988" height="1700" alt="image" src="https://github.com/user-attachments/assets/99d65459-236b-4269-8f6f-87b2b525d8dc" />
-<img width="3021" height="2205" alt="image" src="https://github.com/user-attachments/assets/0d6cc943-629b-47ac-beed-0e3859e0cff8" />
+> **DSH Desktop 多根工作区插件**(桌面适配分支)
+> 基于 [dsh-multiroot-workspace](https://github.com/Blackoutta/dsh-multiroot-workspace) 改造,针对 **DSH Desktop(内置 DeepSeek Harness 0.1.2-alpha.1)** 适配。
 
+在 DSH Desktop 中实现**多根逻辑工作区**:一个逻辑工作区可以包含多个命名根目录(前端、后端、共享库等),其中一个为主根。让 Agent 在一个会话里同时读写多个仓库的代码——类似 Cursor / VS Code 的多根工作区体验。
 
-External DeepSeek Harness bundle providing logical Workspaces with multiple named filesystem roots. It replaces the stock Workspace UI only while installed, using a source fork pinned in [UPSTREAM.md](./UPSTREAM.md); it does not modify Harness repository files.
+---
 
-## Prerequisites
+## ✨ 项目作用
 
-The first public prerelease targets DeepSeek Harness `0.1.0-rc.6` exactly on macOS and Linux. Harness supplies the pinned Cordis, DSH client and Host services, Schemastery, React, and ReactDOM peers when it loads the plugin; consumers should install the plugin through a Harness profile instead of installing those peers into the plugin package. Source development uses Node.js `24.11.1` and pnpm `11.9.0`.
+| 能力 | 说明 |
+|---|---|
+| **多根工作区** | 一个逻辑工作区 = 标题 + 多个根目录(恰一个主根) |
+| **跨仓 Agent 工具** | `ws_list` / `ws_cd` / `ws_read` / `ws_write` / `ws_edit` / `ws_glob` / `ws_grep` / `ws_bash`,按根读写文件、执行命令 |
+| **影子工作区** | 主根自动在宿主工作区注册表建影子,侧栏/会话分组照常工作 |
+| **可视化管理** | 设置页「管理多根工作区」:新建/编辑/删除/设主根/打开工作区,中文界面 |
+| **打开工作区** | 一键创建 cwd=主根的会话,新会话立即获得全部根的 ws_* 工具 |
 
-## Install and start
+## 🔧 与上游的差异(桌面适配)
 
-One command, from any DeepSeek Harness installation:
+| 改动 | 说明 |
+|---|---|
+| 包名 | `dsh-desktop-multiroot-workspace`(v0.1.0-desktop.x) |
+| peerDependencies | 对齐 `^0.1.2-alpha.1`(兼容桌面内置 dsh) |
+| 客户端注入 | 移除不存在的 `dsh-client-runtime`,加入 `remote` |
+| `ui-workspace` | **不再 disable**(alpha.1 客户端树需要其 `uiWorkspace` 服务) |
+| 设置分区 | `settings.section` 新增「管理多根工作区」页(独立 locale 命名空间 `multiroot-settings`,中文) |
+| 目录选择 | 走桌面 Electron 桥 `window.dshDesktopDirectoryPicker` |
+| 打开工作区 | `ctx.sessions.create({workspaceId: 影子})` → 会话 cwd=主根、自动挂载 |
+| 宿主修复 | migrateShadow 会话迁移(不再整体失败)、旧影子自动改名、reconcile 启动兜底、`workspaceOfCwd` 缓存、孤儿 `session_roots` 清理 |
+| 编辑 UI 优化 | 根行内联编辑、主根单选、原生浏览、拖拽排序、即时校验、卡片折叠、toast 反馈(详见 [OPTIMIZATIONS.md](./OPTIMIZATIONS.md)) |
 
-```sh
-cd deepseek-harness
-pnpm dsh plugin --profile web add dsh-multiroot-workspace@next
-pnpm dsh web
+## 📦 安装(部署到 DSH Desktop)
+
+插件以 **profile 级插件**方式安装,不动应用本体,数据存于用户目录(升级应用不丢失)。
+
+### 方式 A:从源码构建部署(推荐)
+
+```bash
+# 1. 构建(依赖已安装过可跳过 install)
+cd dsh-desktop-multiroot-workspace
+pnpm install          # 首次
+npm run build         # tsdown → client.js
+
+# 2. 退出 DSH Desktop
+# 3. 复制插件到桌面 profile
+WEB="$HOME/Library/Application Support/dsh-desktop/harness/profiles/web"
+mkdir -p "$WEB/node_modules/dsh-desktop-multiroot-workspace"
+cp index.js client.js tools.js cordis.patch.yml package.json \
+   "$WEB/node_modules/dsh-desktop-multiroot-workspace/"
+
+# 4. 更新 profile package.json:
+#    dependencies + dsh.profile.bundles 里加入 dsh-desktop-multiroot-workspace
+
+# 5. 重启 DSH Desktop
 ```
 
-Then start the Web UI with `dsh web` and open `http://127.0.0.1:3080/`. The plugin disables only the stock Workspace client row while installed; Sessions, their ordinary Host Workspace membership, and all non-Workspace UI remain owned by Harness.
+### 方式 B:从 npm / 打包产物安装(待发布后)
 
-The bundled configuration keeps cross-root Bash disabled:
-
-```yaml
-- id: multiroot-workspace-tools
-  config:
-    crossRootBash: off
+```bash
+dsh plugin --profile web add dsh-desktop-multiroot-workspace
 ```
 
-To deliberately choose `ancestor` or `unfenced`, put that row in a local patch and start Web with `--patch <file>`. The security differences are described under “Model tools and permissions” below.
+## 🚀 使用
 
-The Host row also accepts one deployment-declared logical Workspace:
+### 1. 打开管理页
+
+DSH Desktop → **设置 → 管理多根工作区**(新分区,在"插件市场"附近)。
+
+- **添加多根工作区**:填名称 → 点「浏览…」或手填路径加根 → 单选主根 → 保存
+- **管理**:改别名/路径、拖拽排序、移除根、切换主根
+- **打开工作区**:一键创建 cwd=主根的新会话
+- **删除**:带确认;目录本身不会被删除
+
+### 2. 在会话里使用 ws_* 工具
+
+打开工作区后,新会话自动获得多根能力:
+
+```
+ws_list                     # 列出所有根与当前根
+ws_cd <alias>               # 切换当前根
+ws_read <path>              # 读文件(根内相对路径)
+ws_write / ws_edit <path>   # 写/改文件(带 read-before-write 与版本守卫)
+ws_bash <cmd>               # 在选定根执行命令
+```
+
+> 跨根 bash 默认关闭(`crossRootBash: off`);需要跨根 shell 时在补丁里改为
+> `ancestor`(限制在共同祖先)或 `unfenced`(危险,无边界),并用 `--patch` 启动。
+
+### 3. 部署声明的只读工作区(可选)
 
 ```yaml
 - id: multiroot-workspace
@@ -48,61 +103,46 @@ The Host row also accepts one deployment-declared logical Workspace:
         primary: false
 ```
 
-`roots` must be non-empty, aliases are unique case-insensitively, and exactly one root must set `primary: true`. This row becomes the read-only logical Workspace `config-roots`: it cannot be renamed, edited, reprioritized, or deleted through the UI/API. Paths may be absent during startup so deployments can mount them later; file and shell operations still require the selected path to exist when used. Purge clears its Session selections and shadow mapping but preserves the declared record and any adopted Host Workspace. Startup reapplies the configuration; a later new Session whose cwd matches the primary root creates or adopts a Host shadow and attaches that Session.
+该行成为只读逻辑工作区 `config-roots`,不可经 UI/API 改名、编辑或删除。
 
-## Development
+## 🔨 开发与构建
 
-```sh
+```bash
 pnpm install --frozen-lockfile
-pnpm run test
 pnpm run typecheck
-pnpm run build
-pnpm exec playwright install chromium
-pnpm run test:browser
+pnpm run test          # 单元测试(含设置分区校验 8 例)
+pnpm run build         # tsdown → dist/index.cjs → client.js
+pnpm run test:browser  # 浏览器端到端(需 playwright chromium)
 ```
 
-The browser check packs the current plugin, creates an isolated temporary DSH home, installs it through the exact public `@deepseek-ai/dsh@0.1.0-rc.6` CLI, and starts Web on a random loopback port. It exercises the public UI with stable fixture titles, aliases, and path suffixes, then stops the server and removes the temporary profile and directories in `finally`; no sibling Harness checkout or manually managed `DSH_WEB_URL` is used.
+构建入口:`src/client/index.ts`(客户端)+ `index.js`(宿主端,构建产物分发)。
+客户端源码在 `src/client/`,设置分区在 `src/client/desktop/`。
 
-The check writes ten review screenshots under `tests/browser/screenshots/`: light and dark variants of the wide sidebar, rail, create dialog, manage dialog, and Hero picker. Runtime directories remain exclusive temporary paths, while their visible screenshot text is normalized to a stable display prefix. These generated PNGs are local review artifacts and are intentionally not staged with release commits; the directory itself is retained by `.gitkeep`.
+## 🧹 清理与回滚
 
-Pull requests and `main` run the same Node.js 24.11.1 / pnpm 11.9.0 release gate in GitHub Actions, including packed-profile, deterministic-build, client-bundle, and browser checks. A `v<package-version>` tag may publish the `next` dist-tag only after that reusable gate passes. Publication uses npm Trusted Publishing through `.github/workflows/release.yml` with GitHub OIDC; no long-lived npm token is used.
+```bash
+# 清理插件数据(可选,保留则重装后数据还在)
+curl -fsS -X DELETE http://127.0.0.1:<port>/plugins/multiroot/api/data
 
-The Host API is served under `/plugins/multiroot/api`. Creating a logical Workspace immediately creates or adopts its primary Host Workspace and returns `shadowWorkspaceId`. The browser joins logical metadata by that id and leaves the stock Workspace list authoritative for Session membership, search, grouping, ordering, and selection.
-
-`ws_cd` stores the current-root selection as plugin-owned state keyed by Session id, so it survives plugin and Harness restarts without adding a custom Session event. A Session with no stored selection uses its logical Workspace's primary root. Deleting or purging that logical Workspace clears its selections. Forked Sessions do not inherit the source Session's selection and therefore begin on the primary root.
-
-The selection table is additive within storage-domain version 4. Harness rc.6 has no domain migration API and rejects a changed version stamp, while its supported backends safely materialize a newly declared table at the existing version; this preserves previously stored logical Workspaces.
-
-## Model tools and permissions
-
-Sessions opened in a logical Workspace receive these tools:
-
-- `ws_list` lists aliases, canonical paths, and the primary/current markers.
-- `ws_cd` changes the plugin-owned current alias for that Session.
-- `ws_read`, `ws_write`, and `ws_edit` access a root-relative text file. The tools reject lexical traversal and canonical targets outside the selected root (including symlink escapes); reads are limited to 1 MiB. Mutations use the Harness read-before-write/version waterfalls and publish `fs/observed` events.
-- `ws_glob` and `ws_grep` run ripgrep inside the selected root and cap output at 200 lines. Ripgrep exit 1 is an empty result; real command failures and cancellation are surfaced.
-- `ws_bash` runs in one selected root by default and passes that exact root to the active sandbox policy. `workdir` cannot escape the selected root.
-
-`crossRootBash` controls an explicit non-empty `roots` list. The default, `off`, rejects multiple roots. `ancestor` fences the process to their tightest common ancestor, which can expose sibling content below that ancestor. `unfenced` requests `danger-full-access` with no `workspaceRoot`; enable it only when the deployment deliberately accepts unrestricted host access. Unknown aliases are always rejected before a shell process starts.
-
-## UI behavior
-
-- **按工作区** shows ordinary and logical Workspace project rows. Logical rows add the root count and primary alias.
-- **全部会话** is the stock flat view: it hides project rows and shows every visible Session once.
-- The branch icon in the Workspace header opens multiroot creation. A logical Workspace row's existing action menu opens management.
-- The management dialog shows complete directory names and paths in a two-column layout. When a Workspace has many roots, only the root list scrolls; the name field, add action, and footer remain fixed.
-- Forms use Harness Modal, Button, icon, and theme primitives; no Unicode folder/archive icons are rendered.
-
-## Storage, purge, and removal
-
-Logical Workspace records, shadow ownership, and per-Session current-root selections live in the plugin's `multiroot_workspace` storage domain. An existing Host Workspace at the primary path is adopted; the plugin never deletes an adopted Workspace. If no suitable Workspace exists, the plugin creates and owns a shadow so stock Session grouping keeps working. Purge deletes owned shadows, user-created logical records, and all current-root selections while preserving adopted user Workspaces, Sessions, and the deployment-declared `config-roots` record.
-
-With Web still running, purge plugin-owned data before removing the package:
-
-```sh
-curl -fsS -X DELETE http://127.0.0.1:3080/plugins/multiroot/api/data
-# Stop the Web process, then remove the profile dependency.
-dsh plugin --profile web remove dsh-multiroot-workspace
+# 从 profile 移除
+# 1. 编辑 profile package.json:移除 dsh-desktop-multiroot-workspace(deps + bundles)
+# 2. 删除 node_modules/dsh-desktop-multiroot-workspace
+# 3. 重启 DSH Desktop
 ```
 
-Removing without the purge request leaves the plugin's durable records for a later reinstall; it does not make the plugin delete them implicitly.
+## 📚 文档
+
+- [DESKTOP-FORK.md](./DESKTOP-FORK.md) — 构建/部署/升级重部署/回滚详述
+- [OPTIMIZATIONS.md](./OPTIMIZATIONS.md) — 17 项优化清单(编辑 UI / 逻辑 / 架构)
+- [UPSTREAM.md](./UPSTREAM.md) — 上游 ui-workspace 源码 fork 说明
+
+## 🛡️ 安全说明
+
+- 工具拒绝词法穿越与符号链接逃逸;读取限 1 MiB;输出限 200 行
+- `ws_bash` 只允许在选定根内执行,`workdir` 不能逃出根
+- `crossRootBash` 默认关闭;`unfenced` 仅限明确接受无边界权限的部署
+- 设置页目录选择走桌面原生桥,不额外暴露远程接口
+
+## 📄 License
+
+MIT(上游 [dsh-multiroot-workspace](https://github.com/Blackoutta/dsh-multiroot-workspace) 与 DeepSeek Harness 的许可见 `LICENSES/`)。
