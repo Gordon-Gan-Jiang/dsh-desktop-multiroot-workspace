@@ -480,7 +480,24 @@ function MultirootSettingsSection(props: {
     setError(null)
     try {
       if (dialogMode === 'edit' && editing !== null && editing.id !== 'draft') {
-        await multirootApi.update(editing.id, { title, roots })
+        const nextPrimary = roots.find((root) => root.primary)?.alias
+        const prevPrimary = editing.roots.find((root) => root.primary)?.alias
+        const primaryChanged = nextPrimary !== undefined
+          && prevPrimary !== undefined
+          && nextPrimary.toLowerCase() !== prevPrimary.toLowerCase()
+        if (primaryChanged) {
+          // The host rejects a primary change inside update(); keep the old
+          // primary in the roots payload, then switch via the dedicated
+          // setPrimary endpoint so both mutations succeed atomically-ish.
+          const rootsKeepingOldPrimary = roots.map((root) => ({
+            ...root,
+            primary: root.alias.toLowerCase() === prevPrimary!.toLowerCase(),
+          }))
+          await multirootApi.update(editing.id, { title, roots: rootsKeepingOldPrimary })
+          await multirootApi.setPrimary(editing.id, nextPrimary)
+        } else {
+          await multirootApi.update(editing.id, { title, roots })
+        }
         notify('ok', t('settings.multiroot.updated', { title }))
       } else {
         await multirootApi.create({ title, roots })

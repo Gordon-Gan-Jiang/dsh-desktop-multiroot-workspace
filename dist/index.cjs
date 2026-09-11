@@ -4732,7 +4732,19 @@ function MultirootSettingsSection(props) {
 		setError(null);
 		try {
 			if (dialogMode === "edit" && editing !== null && editing.id !== "draft") {
-				await multirootApi.update(editing.id, {
+				const nextPrimary = roots.find((root) => root.primary)?.alias;
+				const prevPrimary = editing.roots.find((root) => root.primary)?.alias;
+				if (nextPrimary !== void 0 && prevPrimary !== void 0 && nextPrimary.toLowerCase() !== prevPrimary.toLowerCase()) {
+					const rootsKeepingOldPrimary = roots.map((root) => ({
+						...root,
+						primary: root.alias.toLowerCase() === prevPrimary.toLowerCase()
+					}));
+					await multirootApi.update(editing.id, {
+						title,
+						roots: rootsKeepingOldPrimary
+					});
+					await multirootApi.setPrimary(editing.id, nextPrimary);
+				} else await multirootApi.update(editing.id, {
 					title,
 					roots
 				});
