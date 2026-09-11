@@ -1,7 +1,7 @@
 {
   "name": "dsh-desktop-multiroot-workspace",
   "version": "0.1.0-desktop.2",
-  "description": "Multi-root logical Workspaces for DSH Desktop (fork of dsh-multiroot-workspace, adapted for dsh 0.1.2-alpha.1). One logical workspace = multiple named root directories with a primary root; the Agent edits any root from one session.",
+  "description": "Multi-root logical Workspaces for DSH Desktop: one logical workspace with multiple named root directories and a primary root, so the Agent can edit any root from one session.",
   "author": "Blackoutta <hyytez@gmail.com>",
   "keywords": [
     "deepseek",
@@ -56,10 +56,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Blackoutta/dsh-multiroot-workspace.git"
-  },
-  "bugs": {
-    "url": "https://github.com/Blackoutta/dsh-multiroot-workspace/issues"
+    "url": "https://github.com/Gordon-Gan-Jiang/dsh-desktop-multiroot-workspace.git"
   },
   "publishConfig": {
     "access": "public"
